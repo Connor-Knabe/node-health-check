@@ -29,7 +29,9 @@ if(config.debugMode){
 
 setInterval(function(){
     for (var i=0;i<services.length;i++){
-        checkServiceHealth(services[i].name,services[i].ip+':'+services[i].port+config.healthCheckEndpoint);
+        var healthCheckEndPoint = services[i].route ? services[i].route : config.healthCheckEndpoint;
+        var port = services[i].port ? ':'+services[i].port : '';
+        checkServiceHealth(services[i].name,services[i].ip+port+healthCheckEndPoint);
     }
 }, intervalTime*60*1000);
 
@@ -42,11 +44,9 @@ function sendMessage(alertInfo, msgContent){
     if(alertInfo) {
 		for (var i = 0; i < alertInfo.length; i++) {
             if(alertInfo[i].email){
-                console.log(new Date(), ' Sending email: ', msgContent);
                 sendEmail(alertInfo[i],msgContent);
             }
             if(alertInfo[i].number){
-                console.log(new Date(), ' Sending text: ', msgContent);
                 sendText(alertInfo[i],msgContent);
             }
 		}
@@ -62,10 +62,12 @@ function sendText(alertInfo, msgContent){
         }, function(err, message) {
             if(err){
                 console.error(new Date(), ' Error sending text message for message: ', message, '\nFor error: ', err);
+            } else {
+                console.log(new Date(),' Text sent: ', msgContent);
             }
         });
     } else {
-        console.log('not sending text in debug mode');
+        console.log('not sending text in debug mode',msgContent);
     }
 }
 
@@ -88,10 +90,10 @@ function sendEmail(alertInfo, msgContent){
             if(error){
                 return console.log(error);
             }
-            console.log(new Date(),' Email sent: ');
+            console.log(new Date(),' Email sent: ', msgContent);
         });
     } else {
-        console.log(new Date(), 'not sending email in debug mode');
+        console.log(new Date(), 'not sending email in debug mode', msgContent);
     }
 
 }
@@ -100,11 +102,9 @@ function sendAlert(serviceObj, isOnline){
     var serviceName = serviceObj.name;
         if(isOnline){
             sendMessage(serviceObj.alertInfo,serviceName+' is online!');
-            console.log(new Date()+serviceName+' is online!');
             serviceObj.needsToSend = true;
         } else if(serviceObj.needsToSend) {
             sendMessage(serviceObj.alertInfo,serviceName+' is offline!');
-            console.log(new Date()+serviceName+' is offline!');
             serviceObj.needsToSend = false;
         }
 }
@@ -113,6 +113,15 @@ function retryRequest(name, ip, cb ){
     var operation = retry.operation(retryConfig);
     operation.attempt(function(currentAttempt) {
         request(ip, function (error, response, body) {
+            var statusCode = response && response.statusCode ? response.statusCode : null;
+            // console.log(name,'res', statusCode);
+            // console.log(name,'ip', ip);
+            // if(error){
+            //     console.log(name,'error',error);
+            // }
+            if(statusCode!=200){
+                error = new Error('Invalid route for '+ name);
+            }
             if(operation.retry(error)){
                 return;
             }
