@@ -41,7 +41,8 @@ module.exports.services = [
         server:'DuckDuckGo',
         ip: ServerOneIp,
         port:'80',
-        alertInfo:alertGroup.missionCriticalAlertInfo
+        alertInfo:alertGroup.missionCriticalAlertInfo,
+        route:'/healthCheck'
     },
     {
         name:'Simple banking',

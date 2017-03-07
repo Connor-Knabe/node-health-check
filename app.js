@@ -22,7 +22,7 @@ app.get('/', function(req,res){
 
 checkForValidAlerts(alertGroup);
 populateServicesObj();
-
+var intervalTime = 0.1;
 if(config.debugMode){
 	intervalTime = config.debugIntervalTime;
 }
@@ -31,7 +31,7 @@ setInterval(function(){
     for (var i=0;i<services.length;i++){
         checkServiceHealth(services[i].name,services[i].ip+':'+services[i].port+config.healthCheckEndpoint);
     }
-}, config.intervalTime*60*1000);
+}, intervalTime*60*1000);
 
 function serviceObjectFromName(serviceName){
     var found = services.filter(function(item) { return item.name === serviceName; });
@@ -42,11 +42,11 @@ function sendMessage(alertInfo, msgContent){
     if(alertInfo) {
 		for (var i = 0; i < alertInfo.length; i++) {
             if(alertInfo[i].email){
-                console.log(new Date(), ' Sending email: ', +msgContent);
+                console.log(new Date(), ' Sending email: ', msgContent);
                 sendEmail(alertInfo[i],msgContent);
             }
             if(alertInfo[i].number){
-                console.log(new Date(), ' Sending text: ', +msgContent);
+                console.log(new Date(), ' Sending text: ', msgContent);
                 sendText(alertInfo[i],msgContent);
             }
 		}
