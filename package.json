@@ -1,6 +1,5 @@
-<<<<<<< HEAD
 {
-  "name": "LambdaMonitor",
+  "name": "node-health-check",
   "description": "My Health Check",
   "version": "0.0.1",
   "main": "app.js",
@@ -12,18 +11,3 @@
     "twilio": "2.8.0"
   }
 }
-=======
-{
-  "name": "LambdaMonitor",
-  "description": "My Health Check",
-  "version": "0.0.1",
-  "main": "app.js",
-  "dependencies": {
-    "express": "4.13.3",
-    "nodemailer": "2.3.0",
-    "request": "2.69.0",
-    "retry": "^0.10.1",
-    "twilio": "2.8.0"
-  }
-}
->>>>>>> 50e86336d00e835e1b1133bdcc8fdbcd126063fd
