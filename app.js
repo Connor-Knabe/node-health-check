@@ -114,11 +114,6 @@ function retryRequest(name, ip, cb ){
     operation.attempt(function(currentAttempt) {
         request(ip, function (error, response, body) {
             var statusCode = response && response.statusCode ? response.statusCode : null;
-            // console.log(name,'res', statusCode);
-            // console.log(name,'ip', ip);
-            // if(error){
-            //     console.log(name,'error',error);
-            // }
             if(statusCode!=200){
                 error = new Error('Invalid route for '+ name);
             }
