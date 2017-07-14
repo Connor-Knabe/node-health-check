@@ -108,36 +108,19 @@ function sendEmail(alertInfo, msgContent){
 }
 
 function sendAlert(serviceObj, isOnline){
-	
-    console.log('send is online',isOnline,' alert', new Date());
-
     var serviceName = serviceObj.name;
     var isServiceOnServerInternet = serviceObj.ip == config.serverInternetIp;
-  	console.log('\n\n\n\n\n\n\n\n\n\n\n------------------------------------\n\n\n\n\n');
-  	console.log('Date', new Date());
-    console.log('serviceObj.ip',serviceObj.ip);
-    console.log('services.serverInternetIp',config.serverInternetIp);
-
 	var serverInternetObj = serviceObjectFromName(config.serverInternetName);
 	var internetHealthServer = serviceName == config.serverInternetName;
-	console.log('internet config service name',config.serverInternetName)
-	console.log('service name',serviceName)
 
-	console.log('isServiceOnServerInternet',isServiceOnServerInternet);
-    console.log('is checking server internet', internetHealthServer, new Date());
-    
-    if(internetHealthServer && isServiceOnServerInternet)
-    	console.log('\n\n\n\n\n\n\n\n\n\n\n_____________________\n\n\n\n\n');
-    	
 	if(isServiceOnServerInternet && internetHealthServer){
-		console.log('1',serviceName);
+		console.log(new Date(),' Internet out:',serviceName);
 		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
 	} else if(isServiceOnServerInternet && !internetHealthServer && serverInternetObj.needsToSend){
-		console.log('2',serviceName);
+		console.log(new Date(),' Holka hosted service down:',serviceName);
 		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
 	} else if(!isServiceOnServerInternet){
-		console.log('3',serviceName);
-
+		console.log(new Date(),' External hosted service down:',serviceName);
 		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
 	}            
 }
@@ -160,7 +143,6 @@ function myRetryStrategy(err, response, body){
 
 function checkServiceHealth(name,ip){
 	var serviceObj = serviceObjectFromName(name);
-	console.log('trying',ip, new Date());
 	request({
 		timeout:3000,
 	    url: ip,
@@ -169,10 +151,7 @@ function checkServiceHealth(name,ip){
 	    retryStrategy: myRetryStrategy,
 		maxAttempts: retryAttempts	    
 	})
-	.then(function (response) {
-
-		console.log('success', name);
-		
+	.then(function (response) {		
 		if(response.attempts >= retryAttempts){
 			console.log("Max attempts hit", new Date());
 			serviceObj.isOnline = false;
@@ -186,7 +165,7 @@ function checkServiceHealth(name,ip){
 		}, 15000);
 	})
 	.catch(function(error) {
-		console.log('err',error);
+		console.error( new Date(),' Error making request',error);
         serviceObj.isOnline = false;
 		setTimeout(function(){
 			sendAlert(serviceObj,serviceObj.isOnline);
