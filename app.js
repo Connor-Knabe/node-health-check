@@ -37,8 +37,7 @@ setInterval(function(){
     for (var i=0;i<services.length;i++){
         var healthCheckEndPoint = services[i].route ? services[i].route : config.healthCheckEndpoint;
         var port = services[i].port ? ':'+services[i].port : '';
-        console.log('about to check health', new Date());
-		checkServiceHealth(services[i].name,services[i].ip+port+healthCheckEndPoint);
+		checkServiceHealth(i,services[i].name,services[i].ip+port+healthCheckEndPoint);
     }
 }, intervalTime*60*1000);
 
@@ -112,15 +111,11 @@ function sendAlert(serviceObj, isOnline){
     var isServiceOnServerInternet = serviceObj.ip == config.serverInternetIp;
 	var serverInternetObj = serviceObjectFromName(config.serverInternetName);
 	var internetHealthServer = serviceName == config.serverInternetName;
-
 	if(isServiceOnServerInternet && internetHealthServer){
-		console.log(new Date(),' Internet out:',serviceName);
 		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
-	} else if(isServiceOnServerInternet && !internetHealthServer && serverInternetObj.needsToSend){
-		console.log(new Date(),' Holka hosted service down:',serviceName);
+	} else if(isServiceOnServerInternet && !internetHealthServer && serverInternetObj.isOnline){
 		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
 	} else if(!isServiceOnServerInternet){
-		console.log(new Date(),' External hosted service down:',serviceName);
 		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
 	}            
 }
@@ -141,12 +136,13 @@ function myRetryStrategy(err, response, body){
 }
 
 
-function checkServiceHealth(name,ip){
+function checkServiceHealth(i,name,ip){
+	var alertDelay = i<15 ? i*10*1000 : 3*60*1000;
 	var serviceObj = serviceObjectFromName(name);
 	request({
 		timeout:3000,
 	    url: ip,
-		retryDelay: 2000,
+		retryDelay: 1000,
 	    json:true,
 	    retryStrategy: myRetryStrategy,
 		maxAttempts: retryAttempts	    
@@ -155,21 +151,26 @@ function checkServiceHealth(name,ip){
 		if(response.attempts >= retryAttempts){
 			console.log("Max attempts hit", new Date());
 			serviceObj.isOnline = false;
-			setTimeout(function(){
+			clearTimeout(serviceObj.maxTimeout);
+			serviceObj.maxTimeout = setTimeout(function(){
 				sendAlert(serviceObj,serviceObj.isOnline);
-			}, 15000);
+			}, alertDelay);
+		} else {
+			serviceObj.isOnline = true;
+			clearTimeout(serviceObj.online);
+			serviceObj.online = setTimeout(function(){
+				sendAlert(serviceObj,serviceObj.isOnline);
+			}, alertDelay);
 		}
-		serviceObj.isOnline = true;
-		setTimeout(function(){
-			sendAlert(serviceObj,serviceObj.isOnline);
-		}, 15000);
+
 	})
 	.catch(function(error) {
 		console.error( new Date(),' Error making request',error);
         serviceObj.isOnline = false;
-		setTimeout(function(){
+        clearTimeout(serviceObj.isOffline);
+        serviceObj.isOffline = setTimeout(function(){
 			sendAlert(serviceObj,serviceObj.isOnline);
-		}, 15000);
+		}, alertDelay);
 	});
 }
 
