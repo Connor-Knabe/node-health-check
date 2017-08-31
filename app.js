@@ -7,14 +7,19 @@ var config = require('./settings/servicesConfig.js');
 var client = twilio(loginInfo.TWILIO_ACCOUNT_SID, loginInfo.TWILIO_AUTH_TOKEN);
 var app = express();
 var dns = require('dns');
-var request = require('requestretry');
+// var request = require('requestretry');
+var retry = require('retry');
+var request = require('request');
+
 
 
 var services = config.services;
 var alertGroup = config.alertGroup;
 var retryAttempts = config.retryAttempts;
+var retryConfig = config.retry;
 
-var port = process.env.PORT || 2615;
+
+var port = process.env.PORT || 2616;
 var router = express.Router();
 app.listen(port);
 console.log('Magic happens on port ' + port +' - '+ new Date());
@@ -32,19 +37,24 @@ if(config.debugMode){
 }
 
 
+allServicesCheck(services);
 
 setInterval(function(){
-    for (var i=0;i<services.length;i++){
-        var healthCheckEndPoint = services[i].route ? services[i].route : config.healthCheckEndpoint;
-        var port = services[i].port ? ':'+services[i].port : '';
-		checkServiceHealth(i,services[i].name,services[i].ip+port+healthCheckEndPoint);
-    }
+    allServicesCheck(services);
 }, intervalTime*60*1000);
 
 
+function allServicesCheck(services){
+    for (var i=0;i<services.length;i++){
+        var healthCheckEndPoint = services[i].route ? services[i].route : config.healthCheckEndpoint;
+        var port = services[i].port ? ':'+services[i].port : '';
+        console.log("checking", services[i].name);
+		checkServiceHealth(services[i].ip+port+healthCheckEndPoint,services[i],services);
+    }
+}
 
-function serviceObjectFromName(serviceName){
-    var found = services.filter(function(item) { return item.name === serviceName; });
+function serviceObjectFromName(serviceName,servicesArray){
+    var found = servicesArray.filter(function(item) { return item.name === serviceName; });
     return found[0];
 }
 
@@ -106,72 +116,77 @@ function sendEmail(alertInfo, msgContent){
 
 }
 
-function sendAlert(serviceObj, isOnline){
+function sendAlert(serviceObj, isOnline,servicesArray){
     var serviceName = serviceObj.name;
-    var isServiceOnServerInternet = serviceObj.ip == config.serverInternetIp;
-	var serverInternetObj = serviceObjectFromName(config.serverInternetName);
-	var internetHealthServer = serviceName == config.serverInternetName;
-	if(isServiceOnServerInternet && internetHealthServer){
-		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
-	} else if(isServiceOnServerInternet && !internetHealthServer && serverInternetObj.isOnline){
-		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
-	} else if(!isServiceOnServerInternet){
-		verifyOnlineAndSendMessage(serviceObj,serviceName,isOnline)
-	}            
-}
-
-function verifyOnlineAndSendMessage(serviceObj,serviceName, isOnline){
-	if(isOnline && !serviceObj.needsToSend){
+    if(isOnline){
         sendMessage(serviceObj.alertInfo,serviceName+' is online!');
         serviceObj.needsToSend = true;
-    } else if(!isOnline && serviceObj.needsToSend) {
+    } else if(serviceObj.needsToSend) {
         sendMessage(serviceObj.alertInfo,serviceName+' is offline!');
         serviceObj.needsToSend = false;
-    }	
-}
-
-function myRetryStrategy(err, response, body){
-  // retry the request if we had an error or if the response was a 'Bad Gateway'
-  return err || response.statusCode === 502;
+    }
 }
 
 
-function checkServiceHealth(i,name,ip){
-	var alertDelay = i<15 ? i*10*1000 : 3*60*1000;
-	var serviceObj = serviceObjectFromName(name);
-	request({
-		timeout:3000,
-	    url: ip,
-		retryDelay: 1000,
-	    json:true,
-	    retryStrategy: myRetryStrategy,
-		maxAttempts: retryAttempts	    
-	})
-	.then(function (response) {		
-		if(response.attempts >= retryAttempts){
-			console.log("Max attempts hit", new Date());
-			serviceObj.isOnline = false;
-			clearTimeout(serviceObj.maxTimeout);
-			serviceObj.maxTimeout = setTimeout(function(){
-				sendAlert(serviceObj,serviceObj.isOnline);
-			}, alertDelay);
-		} else {
-			serviceObj.isOnline = true;
-			clearTimeout(serviceObj.online);
-			serviceObj.online = setTimeout(function(){
-				sendAlert(serviceObj,serviceObj.isOnline);
-			}, alertDelay);
-		}
 
-	})
-	.catch(function(error) {
-		console.error( new Date(),' Error making request',error);
-        serviceObj.isOnline = false;
-        clearTimeout(serviceObj.isOffline);
-        serviceObj.isOffline = setTimeout(function(){
-			sendAlert(serviceObj,serviceObj.isOnline);
-		}, alertDelay);
-	});
+//new
+function retryRequest(serviceObj, ip, cb ){
+    console.log('retry request',serviceObj.name,ip);
+    var operation = retry.operation(retryConfig);
+    operation.attempt(function(currentAttempt) {
+        request({timeout:3000, url: ip}, function (error, response, body) {
+            var statusCode = response && response.statusCode ? response.statusCode : null;
+            // if(statusCode!=200 && statusCode!=401){
+            if(statusCode!=200){
+                console.log('errror',serviceObj.name);
+                error = new Error('Invalid route for '+ serviceObj.name);
+            } else if(serviceObj.dependantServices) {
+                console.log(new Date(),'checking all services');
+                allServicesCheck(serviceObj.dependantServices);
+            }
+            if(operation.retry(error)){
+                return;
+            }
+            cb(error ? operation.mainError() : null, serviceObj.name, ip);
+        });
+    });
+}
+
+
+function retryDependantRequest(name, ip, cb ){
+    var operation = retry.operation(retryConfig);
+    operation.attempt(function(currentAttempt) {
+        request({timeout:3000, url: ip}, function (error, response, body) {
+            var statusCode = response && response.statusCode ? response.statusCode : null;
+            if(statusCode!=200){
+                error = new Error('Invalid route for '+ name);
+            } else {
+
+            }
+            if(operation.retry(error)){
+                return;
+            }
+            cb(error ? operation.mainError() : null, name, ip);
+        });
+    });
+}
+
+
+//mixed
+function checkServiceHealth(ip,serviceObject,serviceArray){
+    //new
+    retryRequest(serviceObject,ip, function(err, name, ip){
+        if(err){
+            console.log('offline');
+           serviceObject.isOnline = false;
+           sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
+        } else if (!serviceObject.isOnline) {
+            console.log('online');
+
+           serviceObject.isOnline = true;
+           sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
+        }
+    });
 }
 
 function populateServicesObj(){
@@ -195,4 +210,3 @@ function checkForValidAlerts(alertGroup){
         }
     }
 }
-
