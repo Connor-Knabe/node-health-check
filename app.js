@@ -7,11 +7,8 @@ var config = require('./settings/servicesConfig.js');
 var client = twilio(loginInfo.TWILIO_ACCOUNT_SID, loginInfo.TWILIO_AUTH_TOKEN);
 var app = express();
 var dns = require('dns');
-// var request = require('requestretry');
 var retry = require('retry');
 var request = require('request');
-
-
 
 var services = config.services;
 var alertGroup = config.alertGroup;
@@ -19,7 +16,7 @@ var retryAttempts = config.retryAttempts;
 var retryConfig = config.retry;
 
 
-var port = process.env.PORT || 2616;
+var port = process.env.PORT || 2615;
 var router = express.Router();
 app.listen(port);
 console.log('Magic happens on port ' + port +' - '+ new Date());
@@ -34,10 +31,9 @@ if(config.debugMode){
 	intervalTime = config.debugIntervalTime;
 	retryAttempts = config.debugRetryAttempts;
 	console.log('_____________________________\nIn debug mode will not send any alerts!!\n_____________________________');
+	allServicesCheck(services);
 }
 
-
-allServicesCheck(services);
 
 setInterval(function(){
     allServicesCheck(services);
@@ -136,8 +132,7 @@ function retryRequest(serviceObj, ip, cb ){
     operation.attempt(function(currentAttempt) {
         request({timeout:3000, url: ip}, function (error, response, body) {
             var statusCode = response && response.statusCode ? response.statusCode : null;
-            // if(statusCode!=200 && statusCode!=401){
-            if(statusCode!=200){
+            if(statusCode!=200 && statusCode!=401){
                 console.log('errror',serviceObj.name);
                 error = new Error('Invalid route for '+ serviceObj.name);
             } else if(serviceObj.dependantServices) {
@@ -152,17 +147,15 @@ function retryRequest(serviceObj, ip, cb ){
     });
 }
 
-
 function retryDependantRequest(name, ip, cb ){
     var operation = retry.operation(retryConfig);
     operation.attempt(function(currentAttempt) {
-        request({timeout:3000, url: ip}, function (error, response, body) {
+        request({timeout:4000, url: ip}, function (error, response, body) {
             var statusCode = response && response.statusCode ? response.statusCode : null;
             if(statusCode!=200){
                 error = new Error('Invalid route for '+ name);
-            } else {
-
             }
+            console.log('response',response);
             if(operation.retry(error)){
                 return;
             }
@@ -178,13 +171,12 @@ function checkServiceHealth(ip,serviceObject,serviceArray){
     retryRequest(serviceObject,ip, function(err, name, ip){
         if(err){
             console.log('offline');
-           serviceObject.isOnline = false;
-           sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
+            serviceObject.isOnline = false;
+            sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
         } else if (!serviceObject.isOnline) {
             console.log('online');
-
-           serviceObject.isOnline = true;
-           sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
+            serviceObject.isOnline = true;
+            sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
         }
     });
 }
