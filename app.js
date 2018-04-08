@@ -130,7 +130,7 @@ function retryRequest(serviceObj, ip, cb ){
     console.log('retry request',serviceObj.name,ip);
     var operation = retry.operation(retryConfig);
     operation.attempt(function(currentAttempt) {
-        request({timeout:3000, url: ip}, function (error, response, body) {
+        request({strictSSL:false,timeout:3000, url: ip}, function (error, response, body) {
             var statusCode = response && response.statusCode ? response.statusCode : null;
             if(statusCode!=200 && statusCode!=401){
                 console.log('errror',serviceObj.name);
