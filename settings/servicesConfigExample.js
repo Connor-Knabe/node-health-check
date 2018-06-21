@@ -30,6 +30,7 @@ var alertGroup = {
 };
 
 module.exports.alertGroup = alertGroup;
+const accessToken = "aksjdfkaljsd0ifja0sdfj";
 
 
 //Services info ip port name etc..

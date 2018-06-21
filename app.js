@@ -112,7 +112,7 @@ function sendEmail(alertInfo, msgContent){
 
 }
 
-function sendAlert(serviceObj, isOnline,servicesArray){
+function sendAlert(serviceObj, isOnline){
     var serviceName = serviceObj.name;
     if(isOnline){
         sendMessage(serviceObj.alertInfo,serviceName+' is online!');
@@ -125,25 +125,47 @@ function sendAlert(serviceObj, isOnline,servicesArray){
 
 
 
+
 //new
-function retryRequest(serviceObj, ip, cb ){
+function retryRequest(serviceObj, ip, cb){
     console.log('retry request',serviceObj.name,ip);
     var operation = retry.operation(retryConfig);
     operation.attempt(function(currentAttempt) {
-        request({strictSSL:false,timeout:3000, url: ip}, function (error, response, body) {
-            var statusCode = response && response.statusCode ? response.statusCode : null;
-            if(statusCode!=200 && statusCode!=401){
-                console.log('errror',serviceObj.name);
-                error = new Error('Invalid route for '+ serviceObj.name);
-            } else if(serviceObj.dependantServices) {
-                console.log(new Date(),'checking all services');
-                allServicesCheck(serviceObj.dependantServices);
-            }
-            if(operation.retry(error)){
-                return;
-            }
-            cb(error ? operation.mainError() : null, serviceObj.name, ip);
-        });
+        var requestObj = request;
+        if(serviceObj.isAlternateHealthCheck){
+            console.log('alternate health check');
+            request.put({strictSSL:false,timeout:40000, url: ip,  form: {access_token:config.accessToken}}, function (error, response, body) {
+                var statusCode = response && response.statusCode ? response.statusCode : null;
+                body = JSON.parse(body);
+                if(statusCode!=200 && statusCode!=401 || !body.online){
+                    console.log('errror',serviceObj.name);
+                    error = new Error('Invalid route for '+ serviceObj.name);
+                } else if(serviceObj.dependantServices) {
+                    console.log(new Date(),'checking all services');
+                    allServicesCheck(serviceObj.dependantServices);
+                }
+                if(operation.retry(error)){
+                    return;
+                }
+                cb(error ? operation.mainError() : null, serviceObj.name, ip);
+            });
+        } else{
+            request({strictSSL:false,timeout:3000, url: ip}, function (error, response, body) {
+                var statusCode = response && response.statusCode ? response.statusCode : null;
+                if(statusCode!=200 && statusCode!=401){
+                    console.log('errror',serviceObj.name);
+                    error = new Error('Invalid route for '+ serviceObj.name);
+                } else if(serviceObj.dependantServices) {
+                    console.log(new Date(),'checking all services');
+                    allServicesCheck(serviceObj.dependantServices);
+                }
+                if(operation.retry(error)){
+                    return;
+                }
+                cb(error ? operation.mainError() : null, serviceObj.name, ip);
+            });
+        }
+        
     });
 }
 
@@ -172,17 +194,34 @@ function checkServiceHealth(ip,serviceObject,serviceArray){
         if(err){
             console.log('offline');
             serviceObject.isOnline = false;
-            sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
+            sendAlert(serviceObject,serviceObject.isOnline);
         } else if (!serviceObject.isOnline) {
             console.log('online');
             serviceObject.isOnline = true;
-            sendAlert(serviceObject,serviceObject.isOnline,serviceArray);
+            sendAlert(serviceObject,serviceObject.isOnline);
         }
     });
 }
 
 function populateServicesObj(){
     for (var i=0;i<services.length;i++){
+        console.log(services[i]);
+
+        //need better solution here for nested dependencies
+        if(services[i].dependantServices){
+            services[i].dependantServices.forEach(service => {
+                console.log('service',service);
+                service.isOnline = true;
+                service.needsToSend = true;
+                if(service.dependantServices){
+                    service.dependantServices.forEach(service=>{
+                        console.log('nested service',service);
+                        service.isOnline = true;
+                        service.needsToSend = true;
+                    });
+                }
+            });
+        }
         services[i].isOnline = true;
         services[i].needsToSend = true;
     }
