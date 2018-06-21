@@ -25,7 +25,7 @@ app.get('/', function(req,res){
 });
 
 checkForValidAlerts(alertGroup);
-populateServicesObj();
+populateServicesObj(services);
 var intervalTime = config.intervalTime;
 if(config.debugMode){
 	intervalTime = config.debugIntervalTime;
@@ -133,7 +133,6 @@ function retryRequest(serviceObj, ip, cb){
     operation.attempt(function(currentAttempt) {
         var requestObj = request;
         if(serviceObj.isAlternateHealthCheck){
-            console.log('alternate health check');
             request.put({strictSSL:false,timeout:40000, url: ip,  form: {access_token:config.accessToken}}, function (error, response, body) {
                 var statusCode = response && response.statusCode ? response.statusCode : null;
                 body = JSON.parse(body);
@@ -169,22 +168,6 @@ function retryRequest(serviceObj, ip, cb){
     });
 }
 
-function retryDependantRequest(name, ip, cb ){
-    var operation = retry.operation(retryConfig);
-    operation.attempt(function(currentAttempt) {
-        request({timeout:4000, url: ip}, function (error, response, body) {
-            var statusCode = response && response.statusCode ? response.statusCode : null;
-            if(statusCode!=200){
-                error = new Error('Invalid route for '+ name);
-            }
-            console.log('response',response);
-            if(operation.retry(error)){
-                return;
-            }
-            cb(error ? operation.mainError() : null, name, ip);
-        });
-    });
-}
 
 
 //mixed
@@ -203,27 +186,16 @@ function checkServiceHealth(ip,serviceObject,serviceArray){
     });
 }
 
-function populateServicesObj(){
-    for (var i=0;i<services.length;i++){
-        console.log(services[i]);
+function populateServicesObj(services){
+    var i=0;
 
-        //need better solution here for nested dependencies
-        if(services[i].dependantServices){
-            services[i].dependantServices.forEach(service => {
-                console.log('service',service);
-                service.isOnline = true;
-                service.needsToSend = true;
-                if(service.dependantServices){
-                    service.dependantServices.forEach(service=>{
-                        console.log('nested service',service);
-                        service.isOnline = true;
-                        service.needsToSend = true;
-                    });
-                }
-            });
-        }
+    while(i<services.length){
         services[i].isOnline = true;
         services[i].needsToSend = true;
+        if(services[i].dependantServices){
+            populateServicesObj(services[i].dependantServices);
+        }
+        i++;
     }
 }
 
