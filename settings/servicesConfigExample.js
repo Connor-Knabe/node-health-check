@@ -21,10 +21,11 @@ var alertGroup = {
         {
             name:'Bob',
             number:'314-555-5555',
-            email:'bob@test.com'
+            email:'bob@test.com',
+            iftttUrl:'https://maker.ifttt.com/trigger/ifttt_triger_name_here/with/key/lkasjdf09ajsdf23'
         },
         {
-            name:'This will fail (needs number or email)'
+            name:'This will fail (needs number, iftttUrl, or email)'
         }
     ]
 };

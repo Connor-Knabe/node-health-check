@@ -6,18 +6,17 @@ var loginInfo = require('./settings/loginInfo.js');
 var config = require('./settings/servicesConfig.js');
 var client = twilio(loginInfo.TWILIO_ACCOUNT_SID, loginInfo.TWILIO_AUTH_TOKEN);
 var app = express();
-var dns = require('dns');
 var retry = require('retry');
 var request = require('request');
+var rp = require('request-promise');
+
 
 var services = config.services;
 var alertGroup = config.alertGroup;
-var retryAttempts = config.retryAttempts;
 var retryConfig = config.retry;
 
 
 var port = process.env.PORT || 2615;
-var router = express.Router();
 app.listen(port);
 console.log('Magic happens on port ' + port +' - '+ new Date());
 app.get('/', function(req,res){
@@ -49,10 +48,7 @@ function allServicesCheck(services){
     }
 }
 
-function serviceObjectFromName(serviceName,servicesArray){
-    var found = servicesArray.filter(function(item) { return item.name === serviceName; });
-    return found[0];
-}
+
 
 function sendMessage(alertInfo, msgContent){
     if(alertInfo) {
@@ -63,8 +59,33 @@ function sendMessage(alertInfo, msgContent){
             if(alertInfo[i].number){
                 sendText(alertInfo[i],msgContent);
             }
+            if(alertInfo[i].iftttUrl){
+                sendIftttPush(alertInfo[i],msgContent);
+            }
 		}
 	}
+}
+
+function sendIftttPush(alertInfo, msgContent){
+    var options = {
+        method: 'POST',
+        uri:alertInfo.iftttUrl,
+        body: {
+            value1: msgContent
+        },
+        json: true
+    };
+
+    rp(options)
+        .then(function (parsedBody) {
+            // POST succeeded...
+        })
+        .catch(function (err) {
+            // POST failed...
+            console.error(new Date(), 'error sending to IFTTT',err);
+        });
+
+
 }
 
 function sendText(alertInfo, msgContent){
@@ -123,9 +144,6 @@ function sendAlert(serviceObj, isOnline){
     }
 }
 
-
-
-
 //new
 function retryRequest(serviceObj, ip, cb){
     console.log('retry request',serviceObj.name,ip);
@@ -135,14 +153,19 @@ function retryRequest(serviceObj, ip, cb){
         if(serviceObj.isAlternateHealthCheck){
             request.put({strictSSL:false,timeout:40000, url: ip,  form: {access_token:config.accessToken}}, function (error, response, body) {
                 var statusCode = response && response.statusCode ? response.statusCode : null;
-                body = JSON.parse(body);
-                if(statusCode!=200 && statusCode!=401 || !body.online){
-                    console.log('errror',serviceObj.name);
-                    error = new Error('Invalid route for '+ serviceObj.name);
-                } else if(serviceObj.dependantServices) {
-                    console.log(new Date(),'checking all services');
-                    allServicesCheck(serviceObj.dependantServices);
+                if(body){
+                    body = JSON.parse(body);
+                    if(statusCode!=200 && statusCode!=401 || !body.online){
+                        console.log('errror',serviceObj.name);
+                        error = new Error('Invalid route for '+ serviceObj.name);
+                    } else if(serviceObj.dependantServices) {
+                        console.log(new Date(),'checking all services');
+                        allServicesCheck(serviceObj.dependantServices);
+                    }
+                } else {
+                    error = new Error('No body from request for '+ serviceObj.name);
                 }
+                
                 if(operation.retry(error)){
                     return;
                 }
@@ -171,7 +194,7 @@ function retryRequest(serviceObj, ip, cb){
 
 
 //mixed
-function checkServiceHealth(ip,serviceObject,serviceArray){
+function checkServiceHealth(ip,serviceObject){
     //new
     retryRequest(serviceObject,ip, function(err, name, ip){
         if(err){
@@ -207,8 +230,8 @@ function checkForValidAlerts(alertGroup){
         for (var prop in obj) {
             // skip loop if the property is from prototype
             if(!obj.hasOwnProperty(prop)) continue;
-            if(!obj[prop].number && !obj[prop].email){
-                console.error('Need a number or email for alert group:', key, '\nFor user:', obj[prop]);
+            if(!obj[prop].number && !obj[prop].email && !obj[prop].iftttUrl){
+                console.error('Need a number, iftttUrl or email for alert group:', key, '\nFor user:', obj[prop]);
             }
         }
     }
