@@ -1,0 +1,1 @@
+v2.2 adding ifttt for notifications as an option
