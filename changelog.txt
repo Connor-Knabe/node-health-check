@@ -1,1 +1,2 @@
+v2.4 - adding log if sent to ifttt successful to help debug
 v2.2 adding ifttt for notifications as an option

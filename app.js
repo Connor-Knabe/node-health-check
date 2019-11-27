@@ -79,6 +79,7 @@ function sendIftttPush(alertInfo, msgContent){
     rp(options)
         .then(function (parsedBody) {
             // POST succeeded...
+			console.log('Successfully sent alert to ifttt', alertInfo);
         })
         .catch(function (err) {
             // POST failed...

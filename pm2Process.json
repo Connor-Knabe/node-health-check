@@ -1,0 +1,9 @@
+{
+    "apps": [
+        {
+            "name": "nhc",
+            "script": "app.js",
+			"log_date_format" : "MM/DD/YYYY HH:mm:ss"
+		}
+	]
+}
