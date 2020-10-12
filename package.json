@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "main": "app.js",
   "dependencies": {
-    "express": "4.13.3",
+    "express": "4.17.1",
     "nodemailer": "2.3.0",
     "request": "2.69.0",
     "request-promise": "^4.2.2",
