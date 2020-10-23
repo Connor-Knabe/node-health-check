@@ -9,7 +9,7 @@
     "request": "2.69.0",
     "request-promise": "^4.2.2",
     "requestretry": "^1.12.0",
-    "retry": "^0.10.1",
+    "retry": "^0.12.0",
     "twilio": "2.8.0"
   }
 }
