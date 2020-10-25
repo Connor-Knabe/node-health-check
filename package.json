@@ -5,7 +5,7 @@
   "main": "app.js",
   "dependencies": {
     "express": "4.13.3",
-    "nodemailer": "2.3.0",
+    "nodemailer": "2.7.2",
     "request": "2.69.0",
     "request-promise": "^4.2.2",
     "requestretry": "^1.12.0",
