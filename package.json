@@ -8,7 +8,7 @@
     "nodemailer": "6.4.16",
     "request": "2.88.0",
     "request-promise": "^4.2.2",
-    "requestretry": "^1.12.0",
+    "requestretry": "^7.0.0",
     "retry": "^0.12.0",
     "twilio": "4.6.0",
     "snyk": "^1.437.3"
