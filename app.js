@@ -173,7 +173,7 @@ function retryRequest(serviceObj, ip, cb){
                 cb(error ? operation.mainError() : null, serviceObj.name, ip);
             });
         } else{
-            request({strictSSL:false,timeout:3000, url: ip}, function (error, response, body) {
+            request({strictSSL:false,timeout:6000, url: ip}, function (error, response, body) {
                 var statusCode = response && response.statusCode ? response.statusCode : null;
                 if(statusCode!=200 && statusCode!=401){
                     console.log('errror',serviceObj.name);

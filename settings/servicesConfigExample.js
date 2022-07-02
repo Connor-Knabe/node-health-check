@@ -6,7 +6,7 @@ module.exports.retry = {
     retries: 2,
     factor: 3,
     minTimeout: 1000,
-    maxTimeout: 5000,
+    maxTimeout: 10000,
     randomize: true,
 };
 
